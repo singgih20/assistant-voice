@@ -71,4 +71,4 @@ const AudioVisualizer = ({ isVisible }) => {
   );
 };
 
-export default Audio
+export default AudioVisualizer;
