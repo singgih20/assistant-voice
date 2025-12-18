@@ -1,0 +1,29 @@
+.audio-visualizer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 15px;
+  margin-top: 20px;
+}
+
+.visualizer-canvas {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .audio-visualizer {
+    padding: 15px;
+    margin-top: 15px;
+  }
+  
+  .visualizer-canvas {
+    width: 250px;
+    height: 60px;
+  }
+}

@@ -109,15 +109,18 @@ app.post('/api/chat', async (req, res) => {
     console.log('Processing chat message:', message);
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `Anda adalah asisten AI yang membantu dalam bahasa Indonesia. 
-          Berikan jawaban yang informatif dan ramah. 
-          Serta gunakan bahasa gaul yang tidak terlalu formal.
-          Gunakan kata gue dan lo untuk kata ganti saya dan anda.
-          Gunakan intonasi nada semanusiawi mungkin, bahkan boleh memberikan jeda bicara seperti "hmm" atau "jadi gini.." atau apapun
+          content: `
+            Kamu adalah asisten aplikasi mall.
+                ATURAN WAJIB:
+                - Selalu jaga konteks pembicaraan terakhir
+                - Jika user bertanya ambigu, hubungkan ke topik sebelumnya
+                - Jika masih ambigu, minta klarifikasi singkat
+                - Fokus ke tenant, event, dan promo mall ini
+                - Jangan mengubah topik tanpa alasan
           `
         },
         {
