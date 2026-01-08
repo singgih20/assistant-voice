@@ -160,7 +160,7 @@ app.post('/api/text-to-speech', async (req, res) => {
     console.log('Converting text to speech:', text.substring(0, 50) + '...');
 
     const mp3 = await openai.audio.speech.create({
-      model: 'gpt-4o-mini-tts',
+      model: 'tts-1',
       voice: 'nova', // Options: alloy, echo, fable, onyx, nova, shimmer
       input: text,
       speed: 1.0

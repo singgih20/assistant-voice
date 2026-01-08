@@ -275,7 +275,8 @@ const VoiceChatAI = () => {
       const audioUrl = URL.createObjectURL(audioBlob);
       
       // Create and play audio
-      const audio = new Audio(audioUrl);
+      const audio = document.createElement('audio');
+      audio.src = audioUrl;
       currentAudioRef.current = audio;
 
       // Set up audio event listeners
