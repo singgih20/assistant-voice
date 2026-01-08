@@ -191,8 +191,84 @@ const VoiceChatAI = () => {
       setStatus('AI is thinking...');
       const aiResponse = await chatWithAI(transcriptionText);
       
-      // Add AI message
-      addMessage(aiResponse, 'ai');
+      // Handle different response types
+      if (aiResponse.needsFollowUp) {
+        // Add initial AI message (e.g., "tunggu sebentar")
+        addMessage(aiResponse.message, 'ai');
+        
+        // Convert initial response to speech if TTS is enabled
+        if (enableTTS) {
+          setStatus('Converting text to speech...');
+          setIsSpeaking(true);
+          
+          // Create audio for initial response
+          const response = await fetch('http://localhost:3001/api/text-to-speech', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text: aiResponse.message })
+          });
+
+          if (response.ok) {
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = document.createElement('audio');
+            audio.src = audioUrl;
+            currentAudioRef.current = audio;
+
+            // Set up audio event listeners
+            audio.onloadstart = () => {
+              setStatus('Loading audio...');
+            };
+
+            audio.oncanplay = () => {
+              setStatus('Playing AI voice...');
+            };
+
+            audio.onended = async () => {
+              setIsSpeaking(false);
+              URL.revokeObjectURL(audioUrl);
+              currentAudioRef.current = null;
+              
+              // After initial message is spoken, handle follow-up
+              await handleFollowUpResponse(aiResponse.originalMessage, aiResponse.requestType);
+            };
+
+            audio.onerror = async () => {
+              setIsSpeaking(false);
+              URL.revokeObjectURL(audioUrl);
+              currentAudioRef.current = null;
+              
+              // Even if audio fails, continue with follow-up
+              await handleFollowUpResponse(aiResponse.originalMessage, aiResponse.requestType);
+            };
+
+            // Play the initial audio
+            await audio.play();
+          } else {
+            // If TTS fails, continue with follow-up
+            setIsSpeaking(false);
+            await handleFollowUpResponse(aiResponse.originalMessage, aiResponse.requestType);
+          }
+        } else {
+          // If TTS is disabled, immediately handle follow-up
+          await handleFollowUpResponse(aiResponse.originalMessage, aiResponse.requestType);
+        }
+      } else {
+        // Regular response without follow-up
+        addMessage(aiResponse.message, 'ai');
+        
+        // Convert AI response to speech if TTS is enabled
+        if (enableTTS) {
+          setStatus('Converting text to speech...');
+          setIsSpeaking(true);
+          await textToSpeech(aiResponse.message);
+        } else {
+          setIsProcessing(false);
+          setStatus('Ready to chat!');
+        }
+      }
       
       // Convert AI response to speech if TTS is enabled
       if (enableTTS) {
@@ -239,6 +315,8 @@ const VoiceChatAI = () => {
   };
 
   const chatWithAI = async (message) => {
+    // Step 1: Send message to detect intent
+    setStatus('AI is analyzing your request...');
     const response = await fetch('http://localhost:3001/api/chat', {
       method: 'POST',
       headers: {
@@ -253,7 +331,26 @@ const VoiceChatAI = () => {
     }
 
     const data = await response.json();
-    return data.response;
+    
+    // If it's a data request, handle the 2-step flow like real case
+    if (data.type === 'request_data') {
+      // Step 1: AI says "tunggu sebentar" and speak it first
+      const initialMessage = data.response;
+      
+      // Return the initial message first, let it be spoken
+      return {
+        message: initialMessage,
+        needsFollowUp: true,
+        originalMessage: message,
+        requestType: data.request
+      };
+    }
+    
+    // For general responses, return the response directly
+    return {
+      message: data.response,
+      needsFollowUp: false
+    };
   };
 
   const textToSpeech = async (text) => {
@@ -313,6 +410,130 @@ const VoiceChatAI = () => {
       setIsProcessing(false);
       setStatus('Error with text-to-speech');
     }
+  };
+
+  const handleFollowUpResponse = async (originalMessage, requestType) => {
+    try {
+      // Step 2a: Fetch data from external service (dummy endpoints for testing)
+      // In real case, these would be actual backend services
+      setStatus('Fetching latest information...');
+      let fetchedData;
+      
+      if (requestType === 'get_menu') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/menu');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_stores') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/stores');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_events') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/events');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_rewards') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/rewards');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_location') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/location');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_parking') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/parking');
+        fetchedData = await dataResponse.json();
+      } else if (requestType === 'get_hours') {
+        const dataResponse = await fetch('http://localhost:3001/api/dummy/hours');
+        fetchedData = await dataResponse.json();
+      }
+
+      // Step 2b: Send data to AI for final response
+      if (fetchedData) {
+        setStatus('AI is preparing your information...');
+        const finalResponse = await fetch('http://localhost:3001/api/chat-with-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            originalMessage: originalMessage,
+            dataType: requestType,
+            data: fetchedData
+          })
+        });
+
+        if (finalResponse.ok) {
+          const finalData = await finalResponse.json();
+          
+          // Add the final AI response
+          addMessage(finalData.response, 'ai');
+          
+          // Handle action if exists (for mobile redirect)
+          if (finalData.action) {
+            console.log('Final response action:', finalData.action);
+            // Mobile app can handle this action for navigation
+            // Example: handleMobileAction(finalData.action);
+          }
+          
+          // Convert final response to speech if TTS is enabled
+          if (enableTTS) {
+            setStatus('Converting text to speech...');
+            setIsSpeaking(true);
+            await textToSpeech(finalData.response);
+          } else {
+            setIsProcessing(false);
+            setStatus('Ready to chat!');
+          }
+          
+          return;
+        }
+      }
+      
+      // Fallback if data fetch fails
+      const fallbackMessage = 'Maaf, terjadi kesalahan saat mengambil data. Silakan coba lagi.';
+      addMessage(fallbackMessage, 'ai');
+      
+      if (enableTTS) {
+        setStatus('Converting text to speech...');
+        setIsSpeaking(true);
+        await textToSpeech(fallbackMessage);
+      } else {
+        setIsProcessing(false);
+        setStatus('Ready to chat!');
+      }
+      
+    } catch (error) {
+      console.error('Follow-up error:', error);
+      const errorMessage = 'Maaf, terjadi kesalahan. Silakan coba lagi.';
+      addMessage(errorMessage, 'ai');
+      
+      if (enableTTS) {
+        await textToSpeech(errorMessage);
+      }
+      
+      setIsProcessing(false);
+      setStatus('Ready to chat!');
+    }
+  };
+
+  // Example function to handle mobile actions (for React Native implementation)
+  const handleMobileAction = (action) => {
+    if (!action) return;
+    
+    const { type, target, params } = action;
+    
+    console.log('Handling mobile action:', { type, target, params });
+    
+    // In React Native, you would use navigation here:
+    // switch(type) {
+    //   case 'navigate':
+    //     navigation.navigate(target, params);
+    //     break;
+    //   case 'navigate_detail':
+    //     navigation.navigate(target, params);
+    //     break;
+    //   case 'show_popup':
+    //     showPopup(params);
+    //     break;
+    // }
+    
+    // For web demo, just log the action
+    console.log(`Would navigate to: ${target} with params:`, params);
   };
 
   const addMessage = (content, type) => {
